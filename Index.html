@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSE High-Growth Forecast Dashboard · &gt;30% Upside Picks</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#121a2e; --panel2:#0f1626; --border:#243049;
+    --txt:#e8eefc; --muted:#8a98b8; --accent:#3ddc97; --accent2:#4da3ff;
+    --up:#3ddc97; --down:#ff5c7a; --warn:#ffb454; --gold:#ffd166;
+    --shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%,#16203a 0%,var(--bg) 55%);
+    color:var(--txt); line-height:1.5; padding:18px; min-height:100vh;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+  header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin-bottom:6px}
+  h1{font-size:1.55rem;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:10px}
+  .pulse{width:11px;height:11px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 rgba(61,220,151,.7);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,151,.6)}70%{box-shadow:0 0 0 12px rgba(61,220,151,0)}100%{box-shadow:0 0 0 0 rgba(61,220,151,0)}}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:16px;max-width:880px}
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  button.refresh{background:linear-gradient(135deg,var(--accent2),#2d7fe0);border:none;color:#04122b;font-weight:700;padding:9px 16px;border-radius:9px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:7px;transition:.2s}
+  button.refresh:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(77,163,255,.35)}
+  button.refresh:disabled{opacity:.6;cursor:wait}
+  .status{font-size:.78rem;color:var(--muted)}
+  .status b{color:var(--accent)}
+
+  /* Index strip */
+  .indexbar{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
+  .idx{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:10px 16px;min-width:150px}
+  .idx .lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .idx .val{font-size:1.18rem;font-weight:700;margin-top:2px}
+  .idx .chg{font-size:.8rem;font-weight:600}
+
+  /* KPI summary */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
+  .kpi{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:13px;padding:16px}
+  .kpi .k{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .kpi .v{font-size:1.7rem;font-weight:700;margin-top:4px}
+  .kpi .d{font-size:.76rem;color:var(--muted);margin-top:2px}
+
+  .grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-bottom:22px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}.grid-detail{grid-template-columns:1fr!important}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .card h2{font-size:1.02rem;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .hint{font-size:.76rem;color:var(--muted);margin-bottom:14px}
+  .chartbox{position:relative;height:300px}
+  .chartbox.tall{height:340px}
+
+  /* Table */
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.86rem}
+  th,td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none}
+  th:hover{color:var(--txt)}
+  tbody tr{cursor:pointer;transition:background .15s}
+  tbody tr:hover{background:rgba(77,163,255,.07)}
+  tbody tr.sel{background:rgba(61,220,151,.10);box-shadow:inset 3px 0 0 var(--accent)}
+  .tk{font-weight:700}
+  .nm{color:var(--muted);font-size:.74rem;font-weight:400;display:block;margin-top:1px}
+  .sector-tag{display:inline-block;font-size:.66rem;padding:2px 7px;border-radius:20px;background:rgba(77,163,255,.14);color:var(--accent2);font-weight:600}
+  .sector-tag.def{background:rgba(255,180,84,.14);color:var(--warn)}
+  .sector-tag.ren{background:rgba(61,220,151,.14);color:var(--accent)}
+  .sector-tag.egy{background:rgba(255,209,102,.14);color:var(--gold)}
+  .up{color:var(--up);font-weight:700}
+  .down{color:var(--down);font-weight:700}
+  .upside-pill{font-weight:700;padding:3px 9px;border-radius:7px;background:rgba(61,220,151,.15);color:var(--up);font-size:.82rem}
+  .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:5px;vertical-align:middle}
+  .live-dot.on{background:var(--up);box-shadow:0 0 6px var(--up)}
+  .live-dot.err{background:var(--down)}
+  .risk{font-size:.72rem}
+  .risk .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+  .r-low{background:var(--up)} .r-med{background:var(--warn)} .r-high{background:var(--down)}
+
+  /* Detail panel */
+  .detail{margin-top:4px}
+  .detail-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .detail-head .lhs h3{font-size:1.35rem}
+  .detail-head .price{font-size:2rem;font-weight:700}
+  .grid-detail{display:grid;grid-template-columns:1.3fr 1fr;gap:18px}
+  .catalyst{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:9px;padding:11px 13px;margin-bottom:9px;font-size:.84rem}
+  .catalyst .h{font-weight:600;margin-bottom:2px}
+  .catalyst .src{font-size:.72rem;color:var(--muted);margin-top:4px}
+  .catalyst .src a{color:var(--accent2);text-decoration:none}
+  .catalyst .src a:hover{text-decoration:underline}
+  .riskbox{background:rgba(255,92,122,.06);border:1px solid rgba(255,92,122,.25);border-radius:9px;padding:11px 13px;font-size:.83rem}
+  .riskbox .h{color:var(--down);font-weight:600;margin-bottom:5px}
+  .metric-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--border);font-size:.85rem}
+  .metric-row .l{color:var(--muted)}
+  .metric-row .v{font-weight:600}
+  .targets-vis{margin:10px 0 6px}
+  .bar-track{position:relative;height:34px;background:var(--panel2);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+  .bar-fill{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,rgba(77,163,255,.35),rgba(61,220,151,.5));border-radius:8px}
+  .bar-marker{position:absolute;top:-4px;height:42px;width:2px;background:var(--gold)}
+  .bar-lbl{position:absolute;top:50%;transform:translateY(-50%);font-size:.74rem;font-weight:600;padding:0 8px}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.75rem;color:var(--muted);margin-top:10px}
+  .legend span{display:flex;align-items:center;gap:5px}
+  footer{margin-top:26px;padding-top:16px;border-top:1px solid var(--border);font-size:.74rem;color:var(--muted)}
+  .disclaimer{background:rgba(255,180,84,.07);border:1px solid rgba(255,180,84,.25);border-radius:10px;padding:13px 15px;font-size:.8rem;color:#e8d3ad;margin-bottom:20px}
+  .disclaimer b{color:var(--warn)}
+  a.srclink{color:var(--accent2);text-decoration:none}
+  a.srclink:hover{text-decoration:underline}
+  .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .tab{font-size:.76rem;padding:6px 13px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);cursor:pointer;color:var(--muted)}
+  .tab.active{background:rgba(77,163,255,.16);color:var(--accent2);border-color:rgba(77,163,255,.4)}
+  .spark{height:38px;width:90px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1><span class="pulse"></span>NSE High-Growth Forecast Dashboard</h1>
+    </div>
+    <div class="controls">
+      <span class="status" id="status">Initializing…</span>
+      <button class="refresh" id="refreshBtn" onclick="refreshAll()">↻ Refresh live prices</button>
+    </div>
+  </header>
+  <p class="sub">Live-tracking NSE-listed stocks where leading brokerages currently see <b>&gt;30% upside</b> to 12-month price targets, driven by company investment plans and product demand. Live prices auto-fetch from Yahoo Finance on load. Forecasts and catalysts are sourced from analyst reports (Apr–Jun 2026).</p>
+
+  <div class="disclaimer">
+    <b>⚠ Not investment advice.</b> No tool can reliably predict markets. Upside figures are <i>analyst price targets</i>, not guarantees — they are frequently wrong, and these are high-beta stocks that can fall sharply. Live prices may lag or fail to load depending on your network/CORS. Treat this as a research starting point and consult a SEBI-registered advisor before investing.
+  </div>
+
+  <div class="indexbar" id="indexbar"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>📊 Upside ranking — analyst target vs. live price</h2>
+      <div class="hint">Bars show % upside to consensus/brokerage 12-month target. Click any stock in the table to inspect it.</div>
+      <div class="chartbox tall"><canvas id="upsideChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>🧭 Sector mix &amp; conviction</h2>
+      <div class="hint">Where the structural capital is flowing — defence indigenisation, renewables build-out, energy.</div>
+      <div class="chartbox"><canvas id="sectorChart"></canvas></div>
+      <div class="legend" id="convLegend"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:22px">
+    <h2>📋 Watchlist — live prices &amp; forecasts</h2>
+    <div class="hint">Click a column header to sort · Click a row to load full analysis below · <span class="live-dot on"></span>live <span class="live-dot"></span>loading <span class="live-dot err"></span>fetch failed (showing last snapshot)</div>
+    <div class="tablewrap">
+      <table id="stockTable">
+        <thead>
+          <tr>
+            <th data-k="ticker">Stock</th>
+            <th data-k="sector">Sector</th>
+            <th data-k="price">Live Price (₹)</th>
+            <th data-k="dayChg">Day %</th>
+            <th data-k="trend">5-day</th>
+            <th data-k="target">Target (₹)</th>
+            <th data-k="upside">Upside</th>
+            <th data-k="risk">Risk</th>
+          </tr>
+        </thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card detail" id="detailCard">
+    <!-- filled by JS -->
+  </div>
+
+  <footer>
+    <p><b>Data &amp; sources.</b> Live quotes: Yahoo Finance (<code>query1.finance.yahoo.com</code>), fetched client-side. Analyst targets &amp; catalysts (Apr–Jun 2026): Antique Stock Broking, Centrum Broking, Motilal Oswal (MOFSL), JM Financial, Nirmal Bang, DAM Capital — as reported by Business Today, Trendlyne, and Upstox. Current-price snapshots captured 24–29 Jun 2026.</p>
+    <p style="margin-top:8px">Snapshot baseline date: <b>29 June 2026</b>. If live fetch is blocked by your browser, the dashboard falls back to these snapshot prices so all forecasts still render.</p>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   DATA MODEL
+   prices are SNAPSHOT fallbacks (late June 2026). Live fetch
+   overwrites .price/.dayChg/.spark when Yahoo responds.
+   target = brokerage 12-month target. upside computed live.
+   ============================================================ */
+const STOCKS = [
+  {
+    ticker:"HPCL", yf:"HINDPETRO.NS", name:"Hindustan Petroleum Corp.",
+    sector:"Energy / Oil", sClass:"egy", snapPrice:415.45, target:679, broker:"Antique (Jun '26)",
+    risk:"med", conviction:"High",
+    pe:5.1, mcap:"₹0.88L cr", range52:"₹330 – ₹460",
+    thesis:"Antique's top midcap pick with the highest upside in its model portfolio (~76% at call time). Refining margins normalising plus a massive ₹70,000 cr+ refinery/petchem expansion (Rajasthan Barmer) ramping up; marketing margins expand as crude stays soft.",
+    catalysts:[
+      {h:"₹70,000+ cr Barmer refinery-cum-petrochemical complex", t:"HPCL's flagship Rajasthan project (HRRL) commissioning lifts capacity and adds high-margin petchem — a multi-year earnings driver.", src:"Antique top picks", url:"https://www.businesstoday.in/markets/stocks/story/up-to-76-upside-hal-bhel-mazagon-dock-coforge-bdl-titagarh-hpcl-among-antiques-top-picks-535805-2026-06-09"},
+      {h:"Marketing margins recover on soft crude", t:"Lower oil keeps auto-fuel marketing margins healthy; valuation cheap at ~5x P/E.", src:"Antique", url:"https://www.businesstoday.in/markets/stocks/story/up-to-76-upside-hal-bhel-mazagon-dock-coforge-bdl-titagarh-hpcl-among-antiques-top-picks-535805-2026-06-09"}
+    ],
+    risks:"OMC earnings swing with crude & govt price intervention. Stock down ~12% over 6 months. Refinery commissioning timelines can slip; petchem cycle is weak globally."
+  },
+  {
+    ticker:"WAAREEENER", yf:"WAAREEENER.NS", name:"Waaree Energies",
+    sector:"Renewable / Solar", sClass:"ren", snapPrice:2885, target:4416, broker:"Centrum (Apr '26)",
+    risk:"high", conviction:"High",
+    pe:38, mcap:"₹0.83L cr", range52:"₹1,910 – ₹3,750",
+    thesis:"India's largest solar PV module maker. Aggressive capacity build (modules + new cell + ingot-wafer integration) into a market with a ₹25 lakh-crore renewable investment target by 2030. Q4 net profit jumped ~71% YoY. Centrum sees the widest upside in its solar coverage.",
+    catalysts:[
+      {h:"Backward integration into cells & wafers", t:"New 6 GW cell facility + planned ingot-wafer capacity insulates margins from Chinese imports and ALMM/DCR demand.", src:"Centrum init.", url:"https://www.businesstoday.in/markets/stocks/story/suzlon-waaree-acme-solar-centrum-initiates-coverage-with-upto-80-upside-check-targets-523450-2026-04-01"},
+      {h:"Q4 FY26 net profit +71% YoY to ₹1,061 cr", t:"Strong order book and export demand (US module sales) drive earnings momentum.", src:"Business Today", url:"https://www.indmoney.com/stocks/waaree-energies-ltd-share-price"},
+      {h:"₹25 lakh cr renewable manufacturing target by 2030", t:"PLI + ALMM policy tailwinds underpin multi-year domestic demand.", src:"Univest sector note", url:"https://univest.in/blogs/nse-sector-wise-stock-list-for-multibagger-returns-2026"}
+    ],
+    risks:"High valuation (~38x). Solar module pricing is volatile and exposed to US tariff/policy risk and Chinese oversupply. High-beta — has had >20% drawdowns. Execution risk on rapid capacity expansion."
+  },
+  {
+    ticker:"HAL", yf:"HAL.NS", name:"Hindustan Aeronautics",
+    sector:"Defence", sClass:"def", snapPrice:4278.7, target:5706, broker:"Antique (Jun '26)",
+    risk:"low", conviction:"High",
+    pe:32, mcap:"₹2.9L cr", range52:"₹3,479 – ₹5,065",
+    thesis:"Monopoly defence aerospace OEM riding India's indigenisation (₹6.81 lakh cr defence budget). Huge order backlog from Tejas Mk-1A, Mk-2, and engine/helicopter programs. Antique sees ~35% upside; one of its top largecap defence picks.",
+    catalysts:[
+      {h:"Tejas Mk-1A & Mk-2 multi-year order pipeline", t:"83 + 97 LCA Mk-1A jets plus prospective Mk-2 orders give visibility into the 2030s; order book several times annual revenue.", src:"Antique", url:"https://www.businesstoday.in/markets/stocks/story/up-to-76-upside-hal-bhel-mazagon-dock-coforge-bdl-titagarh-hpcl-among-antiques-top-picks-535805-2026-06-09"},
+      {h:"Defence indigenisation — ₹6.81 lakh cr budget", t:"Positive Indigenisation Lists mandate domestic sourcing, structurally favouring HAL.", src:"Univest defence note", url:"https://univest.in/blogs/multibagger-aerospace-defence-stock"},
+      {h:"Antique target ₹5,706 (~35% upside)", t:"Maximum upside among Antique's largecap defence picks alongside Mazagon Dock.", src:"Business Today", url:"https://www.businesstoday.in/markets/stocks/story/up-to-76-upside-hal-bhel-mazagon-dock-coforge-bdl-titagarh-hpcl-among-antiques-top-picks-535805-2026-06-09"}
+    ],
+    risks:"Execution/delivery delays (engine supply from GE) can defer revenue. Valuation rich at ~32x. Order flow is lumpy and politically/Budget sensitive."
+  },
+  {
+    ticker:"MAZDOCK", yf:"MAZDOCK.NS", name:"Mazagon Dock Shipbuilders",
+    sector:"Defence", sClass:"def", snapPrice:2504, target:3275, broker:"Antique (Jun '26)",
+    risk:"med", conviction:"High",
+    pe:41, mcap:"₹1.0L cr", range52:"₹2,057 – ₹3,369",
+    thesis:"India's premier warship & submarine builder. Beneficiary of the Navy's huge fleet-expansion plan (submarines P-75I, next-gen destroyers/frigates). Antique target ₹3,275 (~35% upside); multiple brokerages (Choice, Ashika) initiated with bullish views.",
+    catalysts:[
+      {h:"P-75I submarine & next-gen warship orders", t:"Large prospective submarine and destroyer/frigate contracts expand an already strong order book.", src:"Antique", url:"https://www.businesstoday.in/markets/stocks/story/up-to-76-upside-hal-bhel-mazagon-dock-coforge-bdl-titagarh-hpcl-among-antiques-top-picks-535805-2026-06-09"},
+      {h:"Defence shipbuilding upcycle", t:"Choice initiated coverage across Mazagon/GRSE/Cochin Shipyard citing a structural naval capex cycle.", src:"Business Today", url:"https://www.businesstoday.in/markets/stocks/story/defence-stocks-choice-initiates-coverage-on-mazagon-dock-grse-cochin-shipyard-targets-535761-2026-06-09"}
+    ],
+    risks:"Order timing lumpy; high P/E (~41x). Execution on complex submarine programs carries delay risk. Stock had a sharp correction from ₹3,369 highs."
+  },
+  {
+    ticker:"BDL", yf:"BDL.NS", name:"Bharat Dynamics",
+    sector:"Defence", sClass:"def", snapPrice:1368.4, target:1800, broker:"Consensus 2026 high",
+    risk:"high", conviction:"Medium",
+    pe:120, mcap:"₹0.50L cr", range52:"₹1,086 – ₹2,013",
+    thesis:"India's missile-systems PSU — Akash, Astra, anti-tank and emerging precision munitions. Featured among Antique's high-upside multibagger picks. Demand driven by indigenisation and export push for missiles.",
+    catalysts:[
+      {h:"Missile order ramp — Akash, Astra, ATGMs", t:"Domestic orders plus a growing export mandate for Indian missiles lift the medium-term order book.", src:"Antique picks", url:"https://www.businesstoday.in/markets/stocks/story/up-to-76-upside-hal-bhel-mazagon-dock-coforge-bdl-titagarh-hpcl-among-antiques-top-picks-535805-2026-06-09"},
+      {h:"Defence export push", t:"Govt target to grow defence exports favours BDL's missile portfolio.", src:"Univest defence note", url:"https://univest.in/blogs/multibagger-aerospace-defence-stock"}
+    ],
+    risks:"Very expensive at ~120x earnings — priced for perfection. Lumpy, milestone-based revenue recognition. Stock nearly halved from its ₹2,013 high; high volatility."
+  },
+  {
+    ticker:"COCHINSHIP", yf:"COCHINSHIP.NS", name:"Cochin Shipyard",
+    sector:"Defence", sClass:"def", snapPrice:1480, target:2555, broker:"SMIFS (Jun '26)",
+    risk:"high", conviction:"Medium",
+    pe:55, mcap:"₹0.39L cr", range52:"₹1,180 – ₹2,980",
+    thesis:"India's largest shipbuilding & ship-repair yard. Beneficiary of the Navy's fleet-expansion and indigenous shipbuilding push, plus a growing commercial/export and ship-repair business. SMIFS sees ~73% upside on naval modernisation and a record order pipeline.",
+    catalysts:[
+      {h:"Naval order pipeline + new dry dock & repair facility", t:"New international ship-repair facility and a larger dry dock expand capacity; prospective warship orders deepen the backlog.", src:"SMIFS / Business Today", url:"https://www.businesstoday.in/markets/story/gsre-mazagon-dock-cochin-shipyard-defence-shipping-stocks-to-buy-for-up-to-82-upside-538936-2026-06-24"},
+      {h:"Indigenous shipbuilding upcycle", t:"Choice and SMIFS both flag a structural naval capex cycle benefiting Cochin Shipyard, GRSE and Mazagon Dock.", src:"Business Today", url:"https://www.businesstoday.in/markets/stocks/story/defence-stocks-choice-initiates-coverage-on-mazagon-dock-grse-cochin-shipyard-targets-535761-2026-06-09"}
+    ],
+    risks:"Very volatile — down sharply from its ₹2,980 high. High P/E (~55x). Order timing is lumpy and milestone-based; revenue can be uneven quarter to quarter. SMIFS's ~73% target is among the most bullish on the Street and may not be representative."
+  },
+  {
+    ticker:"ACMESOLAR", yf:"ACMESOLAR.NS", name:"ACME Solar Holdings",
+    sector:"Renewable / Solar", sClass:"ren", snapPrice:335.75, target:440, broker:"Centrum range (Apr '26)",
+    risk:"high", conviction:"Medium",
+    pe:0, mcap:"₹0.20L cr", range52:"₹220 – ₹345",
+    thesis:"Pure-play renewable IPP scaling a large utility-scale solar/hybrid pipeline with locked-in PPAs. Centrum's coverage flagged up to ~80% upside across its solar names; demand underpinned by India's RE build-out and firm-power (FDRE) tenders.",
+    catalysts:[
+      {h:"Large operational + under-construction RE pipeline", t:"Multi-GW solar/wind-hybrid capacity with long-tenor PPAs gives revenue visibility as projects energise.", src:"Centrum init.", url:"https://www.businesstoday.in/markets/stocks/story/suzlon-waaree-acme-solar-centrum-initiates-coverage-with-upto-80-upside-check-targets-523450-2026-04-01"},
+      {h:"FDRE / firm-power tenders", t:"Shift to round-the-clock renewable tenders favours hybrid IPPs like ACME.", src:"MOFSL power note", url:"https://www.businesstoday.in/markets/stocks/story/suzlon-energy-tata-power-inox-wind-acme-ntpc-waaree-energies-premier-ntpc-iex-mofsl-views-on-power-stocks-531611-2026-05-15"}
+    ],
+    risks:"Capital-intensive IPP model with high leverage; sensitive to interest rates. Earnings lumpy as projects commission. Recently listed — limited track record and high volatility. Target range is wide; nearer-term JM target is lower."
+  }
+];
+
+/* index snapshot fallbacks */
+const INDICES = [
+  {ticker:"^NSEI", label:"NIFTY 50", snap:25900, snapChg:0.0},
+  {ticker:"^NSEBANK", label:"NIFTY BANK", snap:58200, snapChg:0.0},
+  {ticker:"^CNXIT", label:"NIFTY IT", snap:38500, snapChg:0.0}
+];
+
+/* ---------- live fetch via Yahoo (client side) ---------- */
+const YF = (sym) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=5d`;
+// CORS proxies tried in order if direct fetch is blocked
+const PROXIES = [
+  s => s, // direct
+  s => "https://corsproxy.io/?url=" + encodeURIComponent(s),
+  s => "https://api.allorigins.win/raw?url=" + encodeURIComponent(s)
+];
+
+async function fetchQuote(sym){
+  for(const p of PROXIES){
+    try{
+      const r = await fetch(p(YF(sym)), {cache:"no-store"});
+      if(!r.ok) continue;
+      const j = await r.json();
+      const res = j?.chart?.result?.[0];
+      if(!res) continue;
+      const meta = res.meta || {};
+      const closes = (res.indicators?.quote?.[0]?.close || []).filter(v=>v!=null);
+      const price = meta.regularMarketPrice ?? closes.at(-1);
+      const prev = meta.chartPreviousClose ?? meta.previousClose ?? closes.at(-2) ?? price;
+      if(price==null) continue;
+      return { price, prev, dayChg:((price-prev)/prev)*100, spark:closes.slice(-5), ok:true };
+    }catch(e){ /* try next proxy */ }
+  }
+  return { ok:false };
+}
+
+/* ---------- state ---------- */
+let sortKey="upside", sortDir=-1, selected=STOCKS[0].ticker;
+let upsideChart, sectorChart, detailChart;
+const sparkCharts = {};
+
+function computeUpside(s){ return ((s.target - (s.price ?? s.snapPrice)) / (s.price ?? s.snapPrice))*100; }
+
+/* ---------- render: index bar ---------- */
+function renderIndices(){
+  const el = document.getElementById("indexbar");
+  el.innerHTML = INDICES.map(i=>{
+    const price = i.price ?? i.snap;
+    const chg = i.dayChg ?? i.snapChg;
+    const cls = chg>=0?"up":"down";
+    const sign = chg>=0?"+":"";
+    return `<div class="idx">
+      <div class="lbl">${i.label}</div>
+      <div class="val">${price.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+      <div class="chg ${cls}">${sign}${chg.toFixed(2)}%</div>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- render: KPIs ---------- */
+function renderKPIs(){
+  const ups = STOCKS.map(computeUpside);
+  const avg = ups.reduce((a,b)=>a+b,0)/ups.length;
+  const max = Math.max(...ups);
+  const maxName = STOCKS[ups.indexOf(max)].ticker;
+  const live = STOCKS.filter(s=>s.live).length;
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi"><div class="k">Stocks tracked</div><div class="v">${STOCKS.length}</div><div class="d">all with &gt;30% analyst upside</div></div>
+    <div class="kpi"><div class="k">Avg. upside to target</div><div class="v up">+${avg.toFixed(0)}%</div><div class="d">mean across watchlist</div></div>
+    <div class="kpi"><div class="k">Highest upside</div><div class="v up">+${max.toFixed(0)}%</div><div class="d">${maxName}</div></div>
+    <div class="kpi"><div class="k">Live prices loaded</div><div class="v">${live}/${STOCKS.length}</div><div class="d">${live? 'Yahoo Finance':'using snapshot'}</div></div>
+  `;
+}
+
+/* ---------- render: table ---------- */
+function riskLabel(r){ return r==="low"?"Low":r==="med"?"Medium":"High"; }
+function riskDot(r){ return r==="low"?"r-low":r==="med"?"r-med":"r-high"; }
+
+function renderTable(){
+  const rows = [...STOCKS].sort((a,b)=>{
+    let va,vb;
+    switch(sortKey){
+      case "ticker": va=a.ticker; vb=b.ticker; return sortDir*va.localeCompare(vb);
+      case "sector": va=a.sector; vb=b.sector; return sortDir*va.localeCompare(vb);
+      case "price": va=a.price??a.snapPrice; vb=b.price??b.snapPrice; break;
+      case "dayChg": va=a.dayChg??-999; vb=b.dayChg??-999; break;
+      case "target": va=a.target; vb=b.target; break;
+      case "risk": {const o={low:0,med:1,high:2}; va=o[a.risk]; vb=o[b.risk]; break;}
+      default: va=computeUpside(a); vb=computeUpside(b);
+    }
+    return sortDir*(va-vb);
+  });
+  document.getElementById("stockBody").innerHTML = rows.map(s=>{
+    const price = s.price ?? s.snapPrice;
+    const up = computeUpside(s);
+    const dc = s.dayChg;
+    const dcHtml = dc==null? '<span style="color:var(--muted)">—</span>' : `<span class="${dc>=0?'up':'down'}">${dc>=0?'+':''}${dc.toFixed(2)}%</span>`;
+    const dot = s.live? 'on' : (s.fetchErr? 'err':'');
+    return `<tr data-tk="${s.ticker}" class="${s.ticker===selected?'sel':''}" onclick="selectStock('${s.ticker}')">
+      <td><span class="live-dot ${dot}"></span><span class="tk">${s.ticker}</span><span class="nm">${s.name}</span></td>
+      <td><span class="sector-tag ${s.sClass}">${s.sector}</span></td>
+      <td>₹${price.toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+      <td>${dcHtml}</td>
+      <td><canvas class="spark" id="sp_${s.ticker}"></canvas></td>
+      <td>₹${s.target.toLocaleString('en-IN')}</td>
+      <td><span class="upside-pill">+${up.toFixed(0)}%</span></td>
+      <td class="risk"><span class="dot ${riskDot(s.risk)}"></span>${riskLabel(s.risk)}</td>
+    </tr>`;
+  }).join("");
+  rows.forEach(s=>drawSpark(s));
+}
+
+function drawSpark(s){
+  const c = document.getElementById("sp_"+s.ticker);
+  if(!c) return;
+  if(sparkCharts[s.ticker]) sparkCharts[s.ticker].destroy();
+  const data = (s.spark && s.spark.length>1)? s.spark : [s.snapPrice*0.98, s.snapPrice];
+  const rising = data.at(-1) >= data[0];
+  sparkCharts[s.ticker] = new Chart(c,{
+    type:"line",
+    data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:rising?'#3ddc97':'#ff5c7a',borderWidth:2,fill:false,tension:.35,pointRadius:0}]},
+    options:{responsive:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}},animation:false}
+  });
+}
+
+/* ---------- charts ---------- */
+function renderUpsideChart(){
+  const data = [...STOCKS].sort((a,b)=>computeUpside(b)-computeUpside(a));
+  const ctx = document.getElementById("upsideChart");
+  if(upsideChart) upsideChart.destroy();
+  upsideChart = new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:data.map(s=>s.ticker),
+      datasets:[{
+        label:"Upside to target (%)",
+        data:data.map(s=>+computeUpside(s).toFixed(1)),
+        backgroundColor:data.map(s=>s.sClass==='def'?'rgba(255,180,84,.8)':s.sClass==='ren'?'rgba(61,220,151,.8)':'rgba(255,209,102,.8)'),
+        borderRadius:6
+      }]
+    },
+    options:{
+      indexAxis:"y", responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` +${c.raw}% to ₹${data[c.dataIndex].target.toLocaleString('en-IN')} (${data[c.dataIndex].broker})`}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#8a98b8',callback:v=>v+'%'},title:{display:true,text:'% upside to analyst target',color:'#8a98b8'}},
+        y:{grid:{display:false},ticks:{color:'#e8eefc',font:{weight:'600'}}}
+      },
+      onClick:(e,els)=>{ if(els.length) selectStock(data[els[0].index].ticker); }
+    }
+  });
+}
+
+function renderSectorChart(){
+  const map={};
+  STOCKS.forEach(s=>{ const k=s.sClass; map[k]=(map[k]||0)+1; });
+  const labels={def:'Defence',ren:'Renewables',egy:'Energy/Oil'};
+  const colors={def:'rgba(255,180,84,.85)',ren:'rgba(61,220,151,.85)',egy:'rgba(255,209,102,.85)'};
+  const ctx=document.getElementById("sectorChart");
+  if(sectorChart) sectorChart.destroy();
+  sectorChart=new Chart(ctx,{
+    type:"doughnut",
+    data:{labels:Object.keys(map).map(k=>labels[k]),datasets:[{data:Object.values(map),backgroundColor:Object.keys(map).map(k=>colors[k]),borderColor:'#121a2e',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{color:'#e8eefc',padding:14,font:{size:12}}}}}
+  });
+  // conviction legend
+  const conv = STOCKS.reduce((a,s)=>{a[s.conviction]=(a[s.conviction]||0)+1;return a;},{});
+  document.getElementById("convLegend").innerHTML =
+    `<span><span class="dot r-low" style="display:inline-block;width:9px;height:9px;border-radius:50%"></span>High conviction: ${conv['High']||0}</span>
+     <span><span class="dot r-med" style="display:inline-block;width:9px;height:9px;border-radius:50%"></span>Medium: ${conv['Medium']||0}</span>`;
+}
+
+/* ---------- detail panel ---------- */
+function selectStock(tk){
+  selected=tk;
+  document.querySelectorAll('#stockBody tr').forEach(tr=>tr.classList.toggle('sel',tr.dataset.tk===tk));
+  renderDetail();
+}
+
+function renderDetail(){
+  const s=STOCKS.find(x=>x.ticker===selected);
+  const price=s.price??s.snapPrice;
+  const up=computeUpside(s);
+  const dc=s.dayChg;
+  const dcHtml=dc==null?'':`<span class="${dc>=0?'up':'down'}" style="font-size:1rem">${dc>=0?'+':''}${dc.toFixed(2)}% today</span>`;
+  // bar viz: price -> target scale
+  const lo = Math.min(price, s.target)*0.96;
+  const hi = s.target*1.06;
+  const pricePct=((price-lo)/(hi-lo))*100;
+  const tgtPct=((s.target-lo)/(hi-lo))*100;
+
+  document.getElementById("detailCard").innerHTML = `
+    <div class="detail-head">
+      <div class="lhs">
+        <span class="sector-tag ${s.sClass}">${s.sector}</span> <span style="color:var(--muted);font-size:.78rem">· ${s.conviction} conviction · NSE: ${s.ticker}</span>
+        <h3>${s.name}</h3>
+      </div>
+      <div class="rhs" style="text-align:right">
+        <div class="price">₹${price.toLocaleString('en-IN',{maximumFractionDigits:2})}</div>
+        ${dcHtml}
+      </div>
+    </div>
+
+    <div class="targets-vis">
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.max(tgtPct,pricePct)}%"></div>
+        <div class="bar-lbl" style="left:${Math.min(pricePct,82)}%;color:#fff">● ₹${price.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+        <div class="bar-marker" style="left:${tgtPct}%"></div>
+        <div class="bar-lbl" style="right:6px;color:var(--gold)">🎯 ₹${s.target.toLocaleString('en-IN')}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:.78rem;color:var(--muted)">
+        <span>Live price</span>
+        <span><b class="up">+${up.toFixed(1)}% upside</b> · ${s.broker}</span>
+      </div>
+    </div>
+
+    <div class="grid-detail" style="margin-top:14px">
+      <div>
+        <h2 style="font-size:.95rem;margin-bottom:8px">💡 Investment thesis</h2>
+        <p style="font-size:.88rem;color:#d6deef;margin-bottom:14px">${s.thesis}</p>
+        <h2 style="font-size:.95rem;margin-bottom:8px">📰 Catalysts — investments &amp; demand</h2>
+        ${s.catalysts.map(c=>`<div class="catalyst"><div class="h">${c.h}</div><div>${c.t}</div><div class="src">Source: <a href="${c.url}" target="_blank" rel="noopener">${c.src} ↗</a></div></div>`).join("")}
+      </div>
+      <div>
+        <h2 style="font-size:.95rem;margin-bottom:8px">📈 5-day price action</h2>
+        <div class="chartbox" style="height:170px;margin-bottom:14px"><canvas id="detailChart"></canvas></div>
+        <h2 style="font-size:.95rem;margin-bottom:8px">🔢 Key metrics</h2>
+        <div class="metric-row"><span class="l">P/E ratio</span><span class="v">${s.pe? s.pe+'x':'—'}</span></div>
+        <div class="metric-row"><span class="l">Market cap</span><span class="v">${s.mcap}</span></div>
+        <div class="metric-row"><span class="l">52-week range</span><span class="v">${s.range52}</span></div>
+        <div class="metric-row"><span class="l">Analyst target</span><span class="v">₹${s.target.toLocaleString('en-IN')}</span></div>
+        <div class="metric-row"><span class="l">Implied upside</span><span class="v up">+${up.toFixed(1)}%</span></div>
+        <div class="riskbox" style="margin-top:14px">
+          <div class="h">⚠ Risk flags — ${riskLabel(s.risk)}</div>
+          <div>${s.risks}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  // detail chart
+  const data=(s.spark&&s.spark.length>1)?s.spark:[s.snapPrice*0.99,s.snapPrice*1.005,s.snapPrice*0.995,s.snapPrice*1.01,s.snapPrice];
+  const c=document.getElementById("detailChart");
+  if(detailChart) detailChart.destroy();
+  const rising=data.at(-1)>=data[0];
+  detailChart=new Chart(c,{
+    type:"line",
+    data:{labels:data.map((_,i)=>`D-${data.length-1-i}`),datasets:[{label:"Close",data,borderColor:rising?'#3ddc97':'#ff5c7a',backgroundColor:rising?'rgba(61,220,151,.12)':'rgba(255,92,122,.12)',borderWidth:2,fill:true,tension:.35,pointRadius:3,pointBackgroundColor:rising?'#3ddc97':'#ff5c7a'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#8a98b8',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8a98b8',callback:v=>'₹'+v.toFixed(0)}}}}
+  });
+}
+
+/* ---------- refresh orchestration ---------- */
+async function refreshAll(){
+  const btn=document.getElementById("refreshBtn");
+  const st=document.getElementById("status");
+  btn.disabled=true; btn.textContent="↻ Fetching…";
+  st.innerHTML="Fetching live quotes from Yahoo Finance…";
+  let ok=0,fail=0;
+
+  // indices
+  await Promise.all(INDICES.map(async i=>{
+    const q=await fetchQuote(i.ticker);
+    if(q.ok){ i.price=q.price; i.dayChg=q.dayChg; }
+  }));
+  renderIndices();
+
+  // stocks
+  await Promise.all(STOCKS.map(async s=>{
+    const q=await fetchQuote(s.yf);
+    if(q.ok){ s.price=q.price; s.dayChg=q.dayChg; s.spark=q.spark; s.live=true; s.fetchErr=false; ok++; }
+    else { s.live=false; s.fetchErr=true; fail++; }
+  }));
+
+  renderKPIs(); renderTable(); renderUpsideChart(); renderSectorChart(); renderDetail();
+
+  const now=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  if(ok>0 && fail===0) st.innerHTML=`<span style="color:var(--accent)">● Live</span> · ${ok}/${STOCKS.length} updated · ${now}`;
+  else if(ok>0) st.innerHTML=`<span style="color:var(--warn)">● Partial</span> · ${ok} live, ${fail} on snapshot · ${now}`;
+  else st.innerHTML=`<span style="color:var(--down)">● Live fetch blocked</span> · showing 29 Jun snapshot. (Browser CORS/network)`;
+  btn.disabled=false; btn.textContent="↻ Refresh live prices";
+}
+
+/* ---------- init ---------- */
+function init(){
+  renderIndices(); renderKPIs(); renderTable(); renderUpsideChart(); renderSectorChart(); renderDetail();
+  document.querySelectorAll('#stockTable th').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const k=th.dataset.k;
+      if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=(k==='ticker'||k==='sector')?1:-1;}
+      renderTable();
+    });
+  });
+  // auto-fetch live on load
+  refreshAll();
+}
+init();
+</script>
+</body>
+</html>
