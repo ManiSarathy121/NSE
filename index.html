@@ -777,14 +777,23 @@ function setupReveal(){
    ============================================================ */
 const aiCache={}, histCache={};
 let modalHistChart=null, histRange='6M', modalTk=null;
-let aiSettings={mode:'anthropic',base:'',key:'',model:''};
-try{const sv=localStorage.getItem('nsegr_ai');if(sv)aiSettings=Object.assign(aiSettings,JSON.parse(sv));}catch(e){}
+let aiSettings={mode:'9router',base:'https://raf6b53.abc-tunnel.us/v1',key:'sk-58824cf4f07ee369-kytwvj-9963ec0a',model:'Mani-model'};
+try{
+  const sv=localStorage.getItem('nsegr_ai');
+  if(sv) {
+    const parsed=JSON.parse(sv);
+    if(parsed.mode==='9router'&&(parsed.base.includes('68.233.117.244')||!parsed.base)){
+      parsed.base='https://raf6b53.abc-tunnel.us/v1';
+    }
+    aiSettings=Object.assign(aiSettings,parsed);
+  }
+}catch(e){}
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function sigCls(sig){const x=String(sig||'').toLowerCase();if(/(pos|buy|bull|construct|up|strong|accumulat)/.test(x))return'sig-pos';if(/(neg|sell|bear|down|caut|weak|avoid|risk)/.test(x))return'sig-neg';if(/(watch|focus)/.test(x))return'sig-watch';return'sig-neu';}
 function ndCls(imp){const x=String(imp||'').toLowerCase();return x.includes('pos')?'nd-pos':x.includes('neg')?'nd-neg':'nd-mix';}
 
 /* ---------- AI transport (Claude in-app OR OpenAI-compatible) ---------- */
-function parseJSON(text){if(!text)return null;let c=text.replace(/```json/gi,'').replace(/```/g,'').trim();const a=c.indexOf('{'),z=c.lastIndexOf('}');if(a>=0&&z>a)c=c.slice(a,z+1);try{return JSON.parse(c);}catch(e){try{return JSON.parse(c.replace(/,\s*([}\]])/g,'$1'));}catch(e2){return null;}}}
+function parseJSON(text){if(!text)return null;let c=text.replace(/```json/gi,'').replace(/```/g,'').trim();let a=c.indexOf('"market_mood"');if(a>=0){a=c.lastIndexOf('{',a);}else{a=c.indexOf('{');}const z=c.lastIndexOf('}');if(a>=0&&z>a)c=c.slice(a,z+1);try{return JSON.parse(c);}catch(e){try{return JSON.parse(c.replace(/,\s*([}\]])/g,'$1'));}catch(e2){return null;}}}
 async function callAI(prompt,web){
   try{
     if(aiSettings.mode==='openai' || aiSettings.mode==='9router'){
