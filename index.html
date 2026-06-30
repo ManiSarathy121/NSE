@@ -277,17 +277,98 @@
   .set-row input,.set-row select{width:100%;background:var(--panel3);border:1px solid var(--border);border-radius:9px;color:var(--txt);font-size:.84rem;padding:9px 11px;outline:none;transition:.2s}
   .set-row input:focus,.set-row select:focus{border-color:var(--neon2);box-shadow:0 0 10px rgba(21,194,255,.2)}
   .set-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:6px}
+
+  /* ===== Login Overlay ===== */
+  .login-overlay{
+    position:fixed;inset:0;z-index:9999;
+    background:radial-gradient(circle at center, #0a0f1d 0%, #05070e 100%);
+    display:flex;align-items:center;justify-content:center;
+    transition:opacity 0.4s ease, transform 0.4s ease;
+  }
+  .login-box{
+    background:linear-gradient(165deg, var(--panel), var(--panel2));
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:35px 30px;
+    width:100%;
+    max-width:380px;
+    box-shadow:0 25px 60px rgba(0,0,0,0.85);
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .login-box::before{
+    content:"";position:absolute;inset:0;border-radius:16px;padding:1px;
+    background:linear-gradient(120deg, var(--neon2), var(--neon3), var(--neon));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+  }
+  .login-title{
+    font-size:1.45rem;font-weight:800;margin-bottom:8px;
+    background:linear-gradient(90deg, #fff, #9fe9ff, #c9a8ff);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .login-subtitle{
+    color:var(--muted);font-size:0.8rem;margin-bottom:24px;line-height:1.4;
+  }
+  .login-input-wrap{
+    position:relative;margin-bottom:18px;
+  }
+  .login-input{
+    width:100%;background:var(--panel3);border:1px solid var(--border);
+    border-radius:10px;color:var(--txt);font-size:1.05rem;padding:12px 14px;
+    outline:none;text-align:center;transition:0.2s;letter-spacing:3px;
+    font-weight:bold;
+  }
+  .login-input:focus{
+    border-color:var(--neon2);box-shadow:0 0 15px rgba(21,194,255,0.35);
+  }
+  .login-btn{
+    width:100%;background:linear-gradient(135deg, var(--neon2), #0a87d6);
+    border:none;color:#02121f;font-weight:800;padding:13px;border-radius:10px;
+    cursor:pointer;font-size:0.9rem;transition:0.2s;
+  }
+  .login-btn:hover{
+    transform:translateY(-2px);box-shadow:0 8px 22px rgba(21,194,255,0.45);
+  }
+  .login-err{
+    color:var(--down);font-size:0.78rem;margin-top:14px;height:18px;opacity:0;transition:0.2s;
+    font-weight:600;
+  }
+  .login-err.show{opacity:1;}
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    20%,60%{transform:translateX(-6px);}
+    40%,80%{transform:translateX(6px);}
+  }
+  .shake{animation:shake 0.4s ease;}
 </style>
 </head>
 <body>
+<!-- ===== Login Overlay ===== -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box" id="loginBox">
+    <div class="login-title">🔐 Mani AI Watchlist</div>
+    <div class="login-subtitle">Enter password to unlock forecast dashboard</div>
+    <div class="login-input-wrap">
+      <input class="login-input" type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkLogin()">
+    </div>
+    <button class="login-btn" onclick="checkLogin()">Unlock Dashboard</button>
+    <div class="login-err" id="loginErr">Incorrect password. Please try again.</div>
+  </div>
+</div>
 <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
 <div class="wrap">
   <header class="top">
-    <div><h1><span class="pulse"></span>NSE High-Growth Forecast Dashboard</h1></div>
+    <div><h1><span class="pulse"></span>NSE &amp; Global Forecast Dashboard</h1></div>
     <div class="controls">
       <div class="searchbar">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7d8cb0" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="search" type="text" placeholder="Search ticker, name or sector…" oninput="onSearch()">
+      </div>
+      <div class="searchbar" style="min-width:250px">
+        <input id="addSymInput" type="text" placeholder="Add symbol (e.g. AAPL, TCS.NS)…" onkeydown="if(event.key==='Enter')addCustomStock()" style="width: calc(100% - 60px)">
+        <button class="ai-btn sm" onclick="addCustomStock()" style="padding: 4px 8px; margin: -4px -8px -4px 0;">+ Add</button>
       </div>
       <div class="auto-toggle on" id="autoToggle" onclick="toggleAuto()"><span class="sw"></span><span>Auto 45s</span></div>
       <span class="status" id="status">Initializing…</span>
@@ -442,7 +523,32 @@ const STOCKS = [
     targets:[{b:"Centrum (range hi)",r:"Buy",t:440,d:"Apr '26"},{b:"Motilal Oswal",r:"Buy",t:372,d:"'26"},{b:"JM Financial",r:"Buy",t:341,d:"Jun '26"},{b:"Consensus",r:"Buy",t:372,d:"avg"}],
     thesis:"Pure-play renewable IPP scaling a large utility-scale solar/hybrid pipeline with locked-in PPAs. 8,071 MW portfolio (2,990 MW operational + 5,081 MW under construction) plus ~17 GWh BESS. FY26 revenue +59%, PAT +98.5%. Centrum's solar coverage flagged up to ~80% upside; FDRE firm-power tenders favour hybrid IPPs.",
     catalysts:[{h:"8,071 MW portfolio + 17 GWh storage",t:"2,990 MW operational and 5,081 MW under construction with long-tenor PPAs — revenue scales sharply as projects energise.",src:"SolarQuarter",url:"https://solarquarter.com/2026/05/08/acme-solar-holdings-limited-nearly-doubles-fy26-profit-as-revenue-surges-59-on-renewable-capacity-expansion/"},{h:"FY26 revenue +59%, PAT +98.5%",t:"Rapid earnings ramp as capacity commissions; PAT nearly doubled to ₹498 cr.",src:"SolarQuarter",url:"https://solarquarter.com/2026/05/08/acme-solar-holdings-limited-nearly-doubles-fy26-profit-as-revenue-surges-59-on-renewable-capacity-expansion/"},{h:"FDRE / firm-power tenders + BESS",t:"Shift to round-the-clock renewable tenders and a 300 MW storage win favour hybrid IPPs like ACME.",src:"Centrum / MOFSL",url:"https://www.businesstoday.in/markets/stocks/story/suzlon-waaree-acme-solar-centrum-initiates-coverage-with-upto-80-upside-check-targets-523450-2026-04-01"}],
-    risks:"Capital-intensive, leveraged IPP — sensitive to interest rates. Earnings lumpy as projects commission. Recently listed (limited track record), high volatility. The ₹440 figure is the bullish end; nearer-term JM target (₹341) is only ~2% above snapshot."}
+    risks:"Capital-intensive, leveraged IPP — sensitive to interest rates. Earnings lumpy as projects commission. Recently listed (limited track record), high volatility. The ₹440 figure is the bullish end; nearer-term JM target (₹341) is only ~2% above snapshot."},
+  {ticker:"RELIANCE",yf:"RELIANCE.NS",name:"Reliance Industries",sector:"Conglomerate / Energy",sClass:"egy",snapPrice:2450.0,target:3100,broker:"Morgan Stanley",risk:"low",riskScore:3.5,conviction:"High",pe:22,pb:2.1,mcap:1650000,mcapTxt:"₹16.5L cr",range52lo:2200,range52hi:3000,ret1m:1.2,ret6m:4.5,ret1y:12.0,orderBook:"—",orderBookNote:"Retail & Telecom driven",capex:"₹1.2L cr",capexNote:"5G rollout & green energy gigafactories",consensus:{lo:2800,avg:2950,hi:3100},
+    targets:[{b:"Morgan Stanley",r:"Buy",t:3100,d:"Jun '26"},{b:"Jefferies",r:"Buy",t:2950,d:"'26"}],
+    thesis:"India's largest conglomerate. Scaling retail and digital services (Jio) while transition to green energy acts as a long-term catalyst.",
+    catalysts:[{h:"Jio Tariff Hikes",t:"Average revenue per user (ARPU) expansion driving telecom profitability.",src:"CNBC-TV18",url:"#"},{h:"Green Energy Capex",t:"New Energy gigafactories in Jamnagar starting operations in late 2026.",src:"ET",url:"#"}],
+    risks:"Refining margins volatility, high debt from capex, delayed retail IPO unlock."},
+  {ticker:"TCS",yf:"TCS.NS",name:"Tata Consultancy Services",sector:"IT Services",sClass:"ren",snapPrice:3850.0,target:4600,broker:"JPMorgan",risk:"low",riskScore:3.0,conviction:"Medium",pe:28,pb:11.5,mcap:1400000,mcapTxt:"₹14.0L cr",range52lo:3400,range52hi:4250,ret1m:-1.5,ret6m:2.0,ret1y:8.5,orderBook:"$11.2B",orderBookNote:"Q4 TCV wins",capex:"—",capexNote:"Opex-led services model",consensus:{lo:4100,avg:4350,hi:4600},
+    targets:[{b:"JPMorgan",r:"Buy",t:4600,d:"Jun '26"},{b:"Nomura",r:"Buy",t:4350,d:"'26"}],
+    thesis:"Leading global IT services provider. Robust order book (TCV) and operating margins protect cash flow even during discretionary spend slowdowns.",
+    catalysts:[{h:"AI Deal Wins",t:"Securing major generative AI transformation deals in US/Europe.",src:"LiveMint",url:"#"}],
+    risks:"US financial client spend cuts, wage inflation, slower decision cycles."},
+  {ticker:"AAPL",yf:"AAPL",name:"Apple Inc.",sector:"Technology",sClass:"ren",snapPrice:180.0,target:240,broker:"Wedbush",risk:"low",riskScore:3.2,conviction:"High",pe:29,pb:35.0,mcap:2800000,mcapTxt:"$2.8T",range52lo:165,range52hi:220,ret1m:3.0,ret6m:8.5,ret1y:15.0,orderBook:"—",orderBookNote:"Hardware production backlog",capex:"$10B",capexNote:"Data center capacity for Apple Intelligence",consensus:{lo:210,avg:225,hi:240},
+    targets:[{b:"Wedbush",r:"Buy",t:240,d:"Jun '26"},{b:"Goldman Sachs",r:"Buy",t:225,d:"'26"}],
+    thesis:"Global technology leader. Strong ecosystem lock-in, high-margin Services segment growth, and upcoming Apple Intelligence cycle drive structural upside.",
+    catalysts:[{h:"Apple Intelligence Rollout",t:"AI features drive multi-year iPhone replacement supercycle.",src:"Bloomberg",url:"#"}],
+    risks:"Regulatory antitrust actions in US/EU, slowing smartphone market growth."},
+  {ticker:"TSLA",yf:"TSLA",name:"Tesla, Inc.",sector:"Automotive / Clean Energy",sClass:"ren",snapPrice:175.0,target:260,broker:"Ark Invest",risk:"high",riskScore:8.2,conviction:"High",pe:65,pb:8.5,mcap:560000,mcapTxt:"$560B",range52lo:138,range52hi:265,ret1m:12.0,ret6m:-18.0,ret1y:-5.0,orderBook:"—",orderBookNote:"Vehicle backlog ~2 weeks",capex:"$10B",capexNote:"Gigafactory expansions and AI/Dojo compute cluster",consensus:{lo:200,avg:230,hi:260},
+    targets:[{b:"Ark Invest",r:"Buy",t:260,d:"Jun '26"},{b:"Morgan Stanley",r:"Buy",t:230,d:"'26"}],
+    thesis:"EV and autonomy pioneer. Future value centered on Full Self-Driving (FSD), robotaxis, and Dojo supercomputing capabilities alongside battery storage scaling.",
+    catalysts:[{h:"Robotaxi Unveil & FSD v12.5",t:"Unlocking unsupervised autonomy software licensing.",src:"TechCrunch",url:"#"}],
+    risks:"Price war in global EV market, regulatory delays for autonomy software."},
+  {ticker:"NVDA",yf:"NVDA",name:"NVIDIA Corporation",sector:"Semiconductors",sClass:"def",snapPrice:120.0,target:175,broker:"Rosenblatt",risk:"high",riskScore:7.5,conviction:"High",pe:68,pb:42.0,mcap:3000000,mcapTxt:"$3.0T",range52lo:85,range52hi:140,ret1m:8.5,ret6m:45.0,ret1y:110.0,orderBook:"—",orderBookNote:"Blackwell GPU allocation backlog",capex:"$8B",capexNote:"R&D and advanced packaging supply",consensus:{lo:145,avg:160,hi:175},
+    targets:[{b:"Rosenblatt",r:"Buy",t:175,d:"Jun '26"},{b:"KeyBanc",r:"Buy",t:160,d:"'26"}],
+    thesis:"Monopoly supplier of AI data center compute chips. Unprecedented demand for Hopper and next-gen Blackwell GPU architectures keeps margins at record highs.",
+    catalysts:[{h:"Blackwell GPU Shipment Ramp",t:"Volume shipping of Blackwell chips starts late 2026, boosting data center revenues.",src:"Reuters",url:"#"}],
+    risks:"Supply chain constraints (CoWoS packaging), competition from custom hyperscaler chips, high valuation."}
 ];
 const INDICES=[{ticker:"^NSEI",label:"NIFTY 50",snap:25900,snapChg:0.0},{ticker:"^NSEBANK",label:"NIFTY BANK",snap:58200,snapChg:0.0},{ticker:"^CNXIT",label:"NIFTY IT",snap:38500,snapChg:0.0}];
 const SCOL={def:'#ffae3b',ren:'#00ffa3',egy:'#ffd166'};
@@ -450,7 +556,7 @@ const SLABEL={def:'Defence',ren:'Renewables',egy:'Energy/Oil'};
 
 /* ---------- live fetch ---------- */
 const YF=s=>`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=1d&range=5d`;
-const PROXIES=[s=>s,s=>"https://corsproxy.io/?url="+encodeURIComponent(s),s=>"https://api.allorigins.win/raw?url="+encodeURIComponent(s)];
+const PROXIES=[s=>s,s=>"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(s),s=>"https://api.allorigins.win/raw?url="+encodeURIComponent(s)];
 async function fetchQuote(sym){
   for(const p of PROXIES){
     try{
@@ -460,7 +566,8 @@ async function fetchQuote(sym){
       const price=meta.regularMarketPrice??closes.at(-1);
       const prev=meta.chartPreviousClose??meta.previousClose??closes.at(-2)??price;
       if(price==null)continue;
-      return{price,prev,dayChg:((price-prev)/prev)*100,spark:closes.slice(-5),ok:true};
+      const name = meta.shortName || meta.longName || sym;
+      return{price,prev,dayChg:((price-prev)/prev)*100,spark:closes.slice(-5),ok:true,name};
     }catch(e){}
   }
   return{ok:false};
@@ -513,12 +620,12 @@ function renderKPIs(){
   const avg=ups.reduce((a,b)=>a+b,0)/ups.length,max=Math.max(...ups);
   const maxName=STOCKS[ups.indexOf(max)].ticker;
   const live=STOCKS.filter(s=>s.live).length;
-  const def=STOCKS.filter(s=>s.sClass==='def').length,ren=STOCKS.filter(s=>s.sClass==='ren').length;
+  const def=STOCKS.filter(s=>s.sClass==='def').length,ren=STOCKS.filter(s=>s.sClass==='ren').length,egy=STOCKS.filter(s=>s.sClass==='egy').length;
   document.getElementById("kpis").innerHTML=`
     <div class="kpi"><div class="k">Stocks tracked</div><div class="v" id="kpi1">0</div><div class="d">all &gt;30% upside</div></div>
     <div class="kpi"><div class="k">Avg upside</div><div class="v up" id="kpi2">0%</div><div class="d">mean to target</div></div>
     <div class="kpi"><div class="k">Top upside</div><div class="v up" id="kpi3">0%</div><div class="d">${maxName}</div></div>
-    <div class="kpi"><div class="k">Sectors</div><div class="v">${def}<span style="font-size:.9rem;color:var(--amber)">D</span> ${ren}<span style="font-size:.9rem;color:var(--neon)">R</span></div><div class="d">defence · renewables · energy</div></div>
+    <div class="kpi"><div class="k">Sectors</div><div class="v">${def}<span style="font-size:.8rem;color:var(--amber)">D</span> ${ren}<span style="font-size:.8rem;color:var(--neon)">R</span> ${egy}<span style="font-size:.8rem;color:var(--gold)">E</span></div><div class="d">def · ren · energy/global</div></div>
     <div class="kpi"><div class="k">Live loaded</div><div class="v" id="kpi5">0/${STOCKS.length}</div><div class="d">${live?'Yahoo Finance':'snapshot'}</div></div>`;
   countUp(document.getElementById("kpi1"),STOCKS.length);
   countUp(document.getElementById("kpi2"),avg,{dec:0,prefix:"+",suffix:"%"});
@@ -575,7 +682,7 @@ function rowHTML(s){
   const tgtPct=Math.max(0,Math.min(100,((s.target-s.range52lo)/(s.range52hi-s.range52lo))*100));
   return `<tr data-tk="${s.ticker}" class="${s.ticker===selected?'sel':''} ${matches(s)?'':'hidden'}" onclick="selectStock('${s.ticker}')">
     <td><span class="live-dot ${dot}"></span><span class="tk">${s.ticker}</span><span class="nm">${s.name}</span></td>
-    <td><span class="sector-tag ${s.sClass}">${SLABEL[s.sClass]}</span></td>
+    <td><span class="sector-tag ${s.sClass}">${s.sector}</span></td>
     <td class="px-cell" data-px="${p}">₹${fmt(p,2)}</td>
     <td>${pctCell(s.dayChg)}</td>
     <td><canvas class="spark" id="sp_${s.ticker}"></canvas></td>
@@ -617,8 +724,38 @@ function drawSpark(s){
 }
 
 /* ---------- search ---------- */
-function matches(s){if(!searchTerm)return true;const t=searchTerm.toLowerCase();return s.ticker.toLowerCase().includes(t)||s.name.toLowerCase().includes(t)||SLABEL[s.sClass].toLowerCase().includes(t)||s.sector.toLowerCase().includes(t);}
+function matches(s){if(!searchTerm)return true;const t=searchTerm.toLowerCase();return s.ticker.toLowerCase().includes(t)||s.name.toLowerCase().includes(t)||s.sector.toLowerCase().includes(t);}
 function onSearch(){searchTerm=document.getElementById("search").value.trim();renderTable();}
+
+/* ---------- add custom stock ---------- */
+async function addCustomStock(){
+  const input=document.getElementById('addSymInput');
+  const sym=input.value.trim().toUpperCase();
+  if(!sym)return;
+  if(STOCKS.some(s=>s.ticker===sym||s.yf===sym)){alert("Stock already in watchlist!");return;}
+  const st=document.getElementById("status");
+  st.textContent=`Fetching ${sym} from Yahoo Finance...`;
+  const q=await fetchQuote(sym);
+  if(!q.ok){
+    st.textContent=`Failed to find symbol ${sym}`;
+    alert(`Could not fetch data for "${sym}". Make sure it is a valid Yahoo Finance ticker (e.g., AAPL, TSLA, RELIANCE.NS).`);
+    return;
+  }
+  const isGlobal=!sym.endsWith('.NS')&&!sym.endsWith('.BO');
+  const sectorName=isGlobal?'Global Stock':'India Stock';
+  const sClass=isGlobal?'egy':'ren';
+  const newStock={
+    ticker:sym,yf:sym,name:q.name||sym,sector:sectorName,sClass,snapPrice:q.price,price:q.price,dayChg:q.dayChg,spark:q.spark,live:true,target:Math.round(q.price*1.35),broker:"AI Consensus",risk:"med",riskScore:5.0,conviction:"Medium",pe:25.0,pb:3.0,mcap:50000,mcapTxt:isGlobal?`$50B`:`₹50K cr`,range52lo:Math.round(q.price*0.8),range52hi:Math.round(q.price*1.2),ret1m:5.0,ret6m:10.0,ret1y:15.0,orderBook:"—",orderBookNote:"Custom added stock",capex:"—",capexNote:"Click 'Refresh' in live AI section for full research details.",consensus:{lo:Math.round(q.price*1.1),avg:Math.round(q.price*1.25),hi:Math.round(q.price*1.35)},targets:[{b:"AI Consensus",r:"Buy",t:Math.round(q.price*1.35),d:"Live"}],
+    thesis:"Custom added stock. Click on 'Live AI Analysis' inside the modal to generate real-time thesis, catalysts, and financial research for this company.",
+    catalysts:[{h:"Live AI Research",t:"Click 'Refresh' in the AI Analysis panel to scan latest news, order books, and earnings for this stock.",src:"AI Scan",url:"#"}],
+    risks:"Custom added stock. Click 'Refresh' to scan latest risk factors."
+  };
+  STOCKS.push(newStock);
+  input.value="";
+  st.textContent=`Added ${sym}!`;
+  renderTicker();renderKPIs();renderTable();renderUpsideChart();renderScatter();renderPE();renderRange();renderCompare();
+  selectStock(sym);
+}
 
 /* ---------- charts ---------- */
 const animEase={duration:1100,easing:'easeOutQuart'};
@@ -692,7 +829,7 @@ function renderDetail(){
   const pPct=((p-lo)/(hi-lo))*100,tPct=((s.target-lo)/(hi-lo))*100,cLoPct=((s.consensus.lo-lo)/(hi-lo))*100,cHiPct=((s.consensus.hi-lo)/(hi-lo))*100;
   document.getElementById("detailCard").innerHTML=`
     <div class="detail-head">
-      <div class="lhs"><span class="sector-tag ${s.sClass}">${SLABEL[s.sClass]}</span><span class="neutral" style="font-size:.78rem">· ${s.conviction} conviction · NSE: ${s.ticker} · risk ${s.riskScore}/10</span><h3>${s.name}</h3></div>
+      <div class="lhs"><span class="sector-tag ${s.sClass}">${esc(s.sector)}</span><span class="neutral" style="font-size:.78rem">· ${s.conviction} conviction · NSE: ${s.ticker} · risk ${s.riskScore}/10</span><h3>${s.name}</h3></div>
       <div class="rhs" style="text-align:right"><div class="price">₹${fmt(p,2)}</div>${dcHtml}</div></div>
     <div class="targets-vis"><div class="bar-track">
       <div class="bar-fill" style="left:${cLoPct}%;width:${Math.max(2,cHiPct-cLoPct)}%;background:linear-gradient(90deg,rgba(21,194,255,.3),rgba(0,255,163,.4))"></div>
@@ -818,21 +955,21 @@ async function callAI(prompt,web){
 /* ---------- prompts ---------- */
 function stockPrompt(s){const p=price(s);return `You are a markets research assistant for an NSE India stock dashboard. You do NOT give financial advice and never tell the user to buy or sell. Provide balanced, evidence-based research only, with risks made explicit.
 
-Stock: ${s.name} (NSE ticker: ${s.ticker}). Sector: ${s.sector}. Current price approx Rs ${p.toFixed(2)}. Today is ${new Date().toDateString()} (IST).
+Stock: ${s.name} (ticker: ${s.ticker}). Sector: ${s.sector}. Current price approx Rs ${p.toFixed(2)}. Today is ${new Date().toDateString()} (IST).
 
-Use web_search to find the LATEST news (prefer the last 2 weeks) from BOTH global outlets AND Indian financial media (Economic Times, Moneycontrol, Business Standard, LiveMint, Business Today, CNBC-TV18). Cover company-specific news (orders, earnings, capex, management), the sector trend, India macro (RBI, policy, budget, FII/DII flows) and global cues relevant to this sector (e.g. crude for energy/oil, US defence & geopolitics for defence, polysilicon prices/US tariffs for solar).
+Use web_search to find the LATEST news (prefer the last 2 weeks) from BOTH global outlets AND Indian financial media. Cover company-specific news, sector trend, and macro/global cues.
 
 Respond with ONLY a JSON object (no prose, no markdown fences) of this exact shape:
-{"stance":"Constructive|Balanced|Cautious","summary":"2-3 sentence neutral summary of where this stock stands now","today":{"signal":"short label e.g. Neutral / Positive drift / Caution","note":"1-2 sentences on near-term (days) factors"},"month":{"signal":"short label","note":"1-2 sentences on this-month catalysts/events"},"longterm":{"signal":"short label","note":"1-2 sentences on 1-3 year structural drivers"},"news":[{"headline":"...","impact":"positive|negative|mixed","detail":"1 sentence why it matters","source":"publication"}],"risks":["3-5 specific current risk factors for this stock/sector"],"global_context":"1-2 sentences on the global backdrop affecting this sector now","confidence":"low|medium|high"}
-Include 3-5 news items mixing global and Indian sources. Keep every field concise. Base it strictly on what you actually find; if information is thin, say so in summary and set confidence low. Present positives and negatives fairly.`;}
+{"stance":"Constructive|Balanced|Cautious","summary":"Exactly 1 short sentence neutral summary","today":{"signal":"short label","note":"Under 12 words"},"month":{"signal":"short label","note":"Under 12 words"},"longterm":{"signal":"short label","note":"Under 12 words"},"news":[{"headline":"...","impact":"positive|negative|mixed","detail":"Under 12 words","source":"publication"}],"risks":["3 specific short risk factors"],"global_context":"1 short sentence on global backdrop","confidence":"low|medium|high"}
+Keep every field extremely concise (under 12 words per sentence/field). This is critical for speed.`;}
 function signalsPrompt(){const list=STOCKS.map(s=>`${s.ticker} (${s.name}, ${s.sector})`).join('; ');return `You are a markets research assistant. You do NOT give buy/sell advice — balanced research only.
-Today is ${new Date().toDateString()} (IST). Watchlist (NSE India only): ${list}.
+Today is ${new Date().toDateString()} (IST). Watchlist: ${list}.
 
-Use web_search for (1) today's Indian market tone (Nifty 50 / Sensex direction and the actual driver, FII/DII flows, which sectors moved) and (2) the single key global cue today (US markets, crude oil, US Fed, major geopolitics).
+Use web_search for today's Indian market tone and global cues.
 
 Using ONLY tickers from the watchlist above, return ONLY a JSON object (no prose, no fences):
-{"market_mood":"1-2 sentences on today's India market tone with the real driver","global_cue":"1 sentence on the most important global factor today","today_focus":{"ticker":"WATCHLIST_TICKER","why":"1-2 sentences, news-driven, neutral"},"month_focus":{"ticker":"WATCHLIST_TICKER","why":"1-2 sentences on a name with notable month-ahead catalysts"},"longterm_focus":{"ticker":"WATCHLIST_TICKER","why":"1-2 sentences on the strongest structural story"},"caution":{"ticker":"WATCHLIST_TICKER","why":"1-2 sentences on which looks most at-risk now and why"},"as_of":"${new Date().toLocaleDateString('en-IN')}"}
-"In focus" means worth researching today, NOT a recommendation to buy. Keep it concise and factual.`;}
+{"market_mood":"Exactly 1 short sentence on today's India market tone and driver","global_cue":"Exactly 1 short sentence on global factor","today_focus":{"ticker":"WATCHLIST_TICKER","why":"Under 12 words"},"month_focus":{"ticker":"WATCHLIST_TICKER","why":"Under 12 words"},"longterm_focus":{"ticker":"WATCHLIST_TICKER","why":"Under 12 words"},"caution":{"ticker":"WATCHLIST_TICKER","why":"Under 12 words"},"as_of":"${new Date().toLocaleDateString('en-IN')}"}
+Keep every text field extremely concise (under 12 words). This is critical for speed.`;}
 
 /* ---------- daily signals panel ---------- */
 async function generateDailySignals(){
@@ -857,7 +994,7 @@ function renderSignals(j,sources,raw){
 function openModal(tk){
   modalTk=tk;const s=STOCKS.find(x=>x.ticker===tk);if(!s)return;const p=price(s),up=computeUpside(s);
   const dc=s.dayChg==null?'':'<div class="'+(s.dayChg>=0?'up':'down')+'" style="font-size:.95rem;font-weight:700">'+(s.dayChg>=0?'+':'')+s.dayChg.toFixed(2)+'% today</div>';
-  document.getElementById('modalTop').innerHTML='<div><div><span class="sector-tag '+s.sClass+'">'+SLABEL[s.sClass]+'</span> <span class="neutral" style="font-size:.76rem">· NSE: '+s.ticker+' · '+s.conviction+' conviction · risk '+s.riskScore+'/10</span></div><h3>'+esc(s.name)+'</h3></div>'
+  document.getElementById('modalTop').innerHTML='<div><div><span class="sector-tag '+s.sClass+'">'+esc(s.sector)+'</span> <span class="neutral" style="font-size:.76rem">· NSE: '+s.ticker+' · '+s.conviction+' conviction · risk '+s.riskScore+'/10</span></div><h3>'+esc(s.name)+'</h3></div>'
     +'<div style="display:flex;align-items:flex-start;gap:14px"><div style="text-align:right"><div class="px">₹'+fmt(p,2)+'</div>'+dc+'<div style="font-size:.78rem" class="up">+'+up.toFixed(1)+'% to target</div></div><button class="modal-close" onclick="closeModal()" title="Close (Esc)">✕</button></div>';
   document.getElementById('modalBody').innerHTML=
     '<div class="ai-section"><div class="sec-head"><h4>🤖 Live AI analysis — news, outlook &amp; risk</h4><button class="ai-btn ghost sm" onclick="runStockAI(\''+tk+'\',true)">↻ Refresh</button></div>'
@@ -978,8 +1115,35 @@ function saveSettings(){aiSettings={mode:document.getElementById('setMode').valu
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeSettings();}});
 
+/* ---------- authentication ---------- */
+function checkLogin(){
+  const pass = document.getElementById("loginPass").value;
+  const overlay = document.getElementById("loginOverlay");
+  const box = document.getElementById("loginBox");
+  const err = document.getElementById("loginErr");
+  if(pass === "Mani@1"){
+    try{localStorage.setItem("nse_auth", "true");}catch(e){}
+    overlay.style.opacity = "0";
+    overlay.style.transform = "scale(1.05)";
+    setTimeout(() => overlay.style.display = "none", 400);
+  } else {
+    err.classList.add("show");
+    box.classList.add("shake");
+    document.getElementById("loginPass").value = "";
+    setTimeout(() => box.classList.remove("shake"), 400);
+  }
+}
+function checkInitialAuth(){
+  try{
+    if(localStorage.getItem("nse_auth") === "true"){
+      document.getElementById("loginOverlay").style.display = "none";
+    }
+  }catch(e){}
+}
+
 /* ---------- init ---------- */
 function init(){
+  checkInitialAuth();
   renderTheadOnce();renderTicker();renderIndices();renderKPIs();renderTable();renderUpsideChart();renderScatter();renderPE();renderRange();renderCompare();renderDetail();
   setupReveal();
   // inject keyframe for range fade
