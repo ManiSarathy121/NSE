@@ -380,12 +380,12 @@
 <div class="set-pop" id="setPop" onclick="if(event.target===this)closeSettings()">
   <div class="set-box">
     <h3>🤖 AI provider</h3>
-    <p class="sd">Default works instantly inside Claude. Switch to 9Router to use your VPS server (68.233.117.244), or choose OpenAI-compatible for external endpoints (OpenRouter, Groq, etc.).</p>
+    <p class="sd">Default works instantly inside Claude. Switch to 9Router to use your VPS server (https://raf6b53.abc-tunnel.us), or choose OpenAI-compatible for external endpoints (OpenRouter, Groq, etc.).</p>
     <div class="set-row">
       <label>Mode</label>
       <select id="setMode" onchange="onModeChange()">
         <option value="anthropic">Claude in-app (live web search) — default</option>
-        <option value="9router">9Router (VPS) — http://68.233.117.244:20128</option>
+        <option value="9router">9Router (VPS) — https://raf6b53.abc-tunnel.us</option>
         <option value="openai">OpenAI-compatible (OpenRouter / Groq / custom)</option>
       </select>
     </div>
@@ -955,7 +955,7 @@ function onModeChange(){
     const keyInput=document.getElementById('setKey');
     const modelInput=document.getElementById('setModel');
     if(!baseInput.value || baseInput.value==='http://localhost:20128/v1'){
-      baseInput.value='http://68.233.117.244:20128/v1';
+      baseInput.value='https://raf6b53.abc-tunnel.us/v1';
     }
     if(!keyInput.value || keyInput.value==='9router-local'){
       keyInput.value='sk-58824cf4f07ee369-kytwvj-9963ec0a';
